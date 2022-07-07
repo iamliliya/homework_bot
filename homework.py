@@ -8,19 +8,9 @@ from dotenv import load_dotenv
 from http import HTTPStatus
 from telegram import Bot, TelegramError
 
-from exceptions import EmptyList, TokenMissing
+from exceptions import TokenMissing
 
 load_dotenv()
-
-# TODO
-# [x] отсутствие обязательных переменных окружения во время запуска бота (уровень CRITICAL).
-# [х] удачная отправка любого сообщения в Telegram (уровень INFO);
-# [x] сбой при отправке сообщения в Telegram (уровень ERROR);
-# [?] недоступность эндпоинта https://practicum.yandex.ru/api/user_api/homework_statuses/ (уровень ERROR);
-# [?] любые другие сбои при запросе к эндпоинту (уровень ERROR);
-# [x] отсутствие ожидаемых ключей в ответе API (уровень ERROR);
-# [x] недокументированный статус домашней работы, обнаруженный в ответе API (уровень ERROR);
-# [] отсутствие в ответе новых статусов (уровень DEBUG).]
 
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
@@ -67,7 +57,7 @@ def check_response(response):
     if not isinstance(response, dict):
         raise TypeError('Тип ответа API не словарь')
     if not isinstance(response.get('homeworks'), list):
-        raise TypeError('Тип "Homeworks" не список')
+        raise TypeError('Тип "homeworks" не список')
     if not response.get('homeworks') or response.get('homeworks') is None:
         raise KeyError('Ключ "homeworks" отсутствуeт в ответе API')
     else:
@@ -100,43 +90,37 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-    current_timestamp = int(time.time()) - 30 * 24 * 3600
-    # current_timestamp = int(time.time())
+    # current_timestamp = int(time.time()) - 30 * 24 * 3600
+    current_timestamp = int(time.time())
     bot = Bot(token=TELEGRAM_TOKEN)
+    previous_message = ''
     while check_tokens() is True:
         try:
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
-            homework = homeworks[0]
-            message = parse_status(homework)
-            send_message(bot, message)
-            current_timestamp = int(time.time()) - 30 * 24 * 3600
+            if homeworks != []:
+                homework = homeworks[0]
+                message = parse_status(homework)
         except ConnectionError as error:
             logging.error(error, exc_info=True)
         except TypeError as error:
             logging.error(error, exc_info=True)
             message = 'Тип данных в ответе API не соответствует ожидаемому'
-            # send_message(bot, message)
-        except EmptyList as error:
-            logging.error(error, exc_info=True)
-            message = 'В списке нет домашних работ за указанный период'
-            # send_message(bot, message)
         except IndexError as error:
             logging.error(error, exc_info=True)
-            message = 'Нет работы с таким индексом'
+            message = 'В списке нет домашних работ за указанный период'
         except KeyError as error:
             logging.error(error, exc_info=True)
-            message = 'Запрашиваемый ключ не найден'
-            # send_message(bot, message)
+            message = 'Ожидаемые ключи в ответе API отсутствуют'
         except TelegramError as error:
             message = f'Сбой в работе программы {error}'
             logging.error(message, exc_info=True)
-        previous_message = message
-        if message == previous_message:
-            logging.debug(msg='Нет обновлений', exc_info=True)
-            time.sleep(RETRY_TIME)
-        else:
+        if previous_message != message:
             send_message(bot, message)
+            previous_message = message
+        else:
+            time.sleep(RETRY_TIME)
+            current_timestamp = int(time.time())
     else:
         logging.critical(exc_info=True)
         raise TokenMissing(

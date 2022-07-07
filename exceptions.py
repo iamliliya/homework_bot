@@ -3,10 +3,3 @@ class TokenMissing(Exception):
 
     pass
 
-
-class EmptyList(Exception):
-    """Список домашних заданий пустой."""
-
-    pass
-
-
