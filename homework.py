@@ -59,10 +59,12 @@ def check_response(response):
     """
     if not isinstance(response, dict):
         raise TypeError('Тип ответа API не словарь')
-    if not isinstance(response.get('homeworks'), list):
+    homeworks = response.get('homeworks')
+    if not isinstance(homeworks, list):
         raise TypeError('Тип "homeworks" не список')
-    else:
-        return response.get('homeworks')
+    elif not homeworks:
+        raise HomeworkListEmpty('В списке нет домашних работ')
+    return homeworks
 
 
 def parse_status(homework):
@@ -98,12 +100,10 @@ def main():
         try:
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
-            if not homeworks:
-                raise HomeworkListEmpty('В списке нет домашних работ')
-            else:
-                if len(homeworks) > 0:
-                    homework = homeworks[0]
-                    message = parse_status(homework)
+            if len(homeworks) > 0:
+                assert len(homeworks) == 1
+                homework = homeworks[0]
+                message = parse_status(homework)
         except APIPracticumNotAvaliable as error:
             logging.error(error, exc_info=True)
         except TypeError as error:
