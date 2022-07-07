@@ -8,7 +8,10 @@ from dotenv import load_dotenv
 from http import HTTPStatus
 from telegram import Bot, TelegramError
 
-from exceptions import TokenMissing
+from exceptions import (
+    APIPracticumNotAvaliable,
+    HomeworkListEmpty,
+    TokenMissing)
 
 load_dotenv()
 
@@ -31,7 +34,7 @@ HOMEWORK_STATUSES = {
 }
 
 
-def send_message(bot, message):
+def send_message(bot: Bot, message: str):
     """Функция отправляет сообщение о статусе домашней работы в чат."""
     bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
     logging.info(f'Бот успешно отправил сообщение "{message}"')
@@ -39,13 +42,13 @@ def send_message(bot, message):
 
 def get_api_answer(current_timestamp):
     """Функция делает запрос к API и возвращает ответ API."""
-    timestamp = current_timestamp or int(time.time())
+    timestamp = current_timestamp
     params = {'from_date': timestamp}
     response = requests.get(ENDPOINT, headers=HEADERS, params=params)
     if response.status_code == HTTPStatus.OK:
         return response.json()
     else:
-        raise ConnectionError(
+        raise APIPracticumNotAvaliable(
             f'API {ENDPOINT} не доступен, код ответа: {response.status_code}'
         )
 
@@ -58,8 +61,6 @@ def check_response(response):
         raise TypeError('Тип ответа API не словарь')
     if not isinstance(response.get('homeworks'), list):
         raise TypeError('Тип "homeworks" не список')
-    if not response.get('homeworks') or response.get('homeworks') is None:
-        raise KeyError('Ключ "homeworks" отсутствуeт в ответе API')
     else:
         return response.get('homeworks')
 
@@ -69,11 +70,11 @@ def parse_status(homework):
     Возвращает строку-вердикт из словаря HOMEWORK_STATUSES.
     """
     homework_name = homework.get('homework_name')
-    if not homework_name or homework_name is None:
+    if not homework_name:
         raise KeyError(f'Ключ {homework_name} не найден в {homework}')
     homework_status = homework.get('status')
     verdict = HOMEWORK_STATUSES.get(homework_status)
-    if not verdict or verdict is None:
+    if not verdict:
         raise KeyError(
             f'{homework_status} не найден в {HOMEWORK_STATUSES}'
         )
@@ -90,7 +91,6 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-    # current_timestamp = int(time.time()) - 30 * 24 * 3600
     current_timestamp = int(time.time())
     bot = Bot(token=TELEGRAM_TOKEN)
     previous_message = ''
@@ -98,15 +98,18 @@ def main():
         try:
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
-            if homeworks != []:
-                homework = homeworks[0]
-                message = parse_status(homework)
-        except ConnectionError as error:
+            if not homeworks:
+                raise HomeworkListEmpty('В списке нет домашних работ')
+            else:
+                if len(homeworks) > 0:
+                    homework = homeworks[0]
+                    message = parse_status(homework)
+        except APIPracticumNotAvaliable as error:
             logging.error(error, exc_info=True)
         except TypeError as error:
             logging.error(error, exc_info=True)
             message = 'Тип данных в ответе API не соответствует ожидаемому'
-        except IndexError as error:
+        except HomeworkListEmpty as error:
             logging.error(error, exc_info=True)
             message = 'В списке нет домашних работ за указанный период'
         except KeyError as error:
@@ -119,13 +122,13 @@ def main():
             send_message(bot, message)
             previous_message = message
         else:
-            time.sleep(RETRY_TIME)
             current_timestamp = int(time.time())
+            time.sleep(RETRY_TIME)
     else:
         logging.critical(exc_info=True)
         raise TokenMissing(
             'Одна или несколько переменных окружения не найдены',
-            exc_info=True)
+        )
 
 
 if __name__ == '__main__':

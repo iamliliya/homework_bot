@@ -3,3 +3,8 @@ class TokenMissing(Exception):
 
     pass
 
+
+class APIPracticumNotAvaliable(Exception):
+    """API Yandex Practicum не доступен."""
+
+    pass
