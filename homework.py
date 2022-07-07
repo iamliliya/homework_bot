@@ -8,10 +8,7 @@ from dotenv import load_dotenv
 from http import HTTPStatus
 from telegram import Bot, TelegramError
 
-from exceptions import (
-    APIPracticumNotAvaliable,
-    HomeworkListEmpty,
-    TokenMissing)
+import exceptions
 
 load_dotenv()
 
@@ -48,7 +45,7 @@ def get_api_answer(current_timestamp):
     if response.status_code == HTTPStatus.OK:
         return response.json()
     else:
-        raise APIPracticumNotAvaliable(
+        raise exceptions.APIPracticumNotAvaliable(
             f'API {ENDPOINT} не доступен, код ответа: {response.status_code}'
         )
 
@@ -63,7 +60,7 @@ def check_response(response):
     if not isinstance(homeworks, list):
         raise TypeError('Тип "homeworks" не список')
     elif not homeworks:
-        raise HomeworkListEmpty('В списке нет домашних работ')
+        raise exceptions.HomeworkListEmpty('В списке нет домашних работ')
     return homeworks
 
 
@@ -104,12 +101,12 @@ def main():
                 assert len(homeworks) == 1
                 homework = homeworks[0]
                 message = parse_status(homework)
-        except APIPracticumNotAvaliable as error:
+        except exceptions.APIPracticumNotAvaliable as error:
             logging.error(error, exc_info=True)
         except TypeError as error:
             logging.error(error, exc_info=True)
             message = 'Тип данных в ответе API не соответствует ожидаемому'
-        except HomeworkListEmpty as error:
+        except exceptions.HomeworkListEmpty as error:
             logging.error(error, exc_info=True)
             message = 'В списке нет домашних работ за указанный период'
         except KeyError as error:
@@ -126,7 +123,7 @@ def main():
             time.sleep(RETRY_TIME)
     else:
         logging.critical(exc_info=True)
-        raise TokenMissing(
+        raise exceptions.TokenMissing(
             'Одна или несколько переменных окружения не найдены',
         )
 
