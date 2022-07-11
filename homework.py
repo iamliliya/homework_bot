@@ -1,3 +1,5 @@
+import exceptions
+import json
 import logging
 import os
 import requests
@@ -8,7 +10,6 @@ from dotenv import load_dotenv
 from http import HTTPStatus
 from telegram import Bot, TelegramError
 
-import exceptions
 
 load_dotenv()
 
@@ -33,21 +34,27 @@ HOMEWORK_STATUSES = {
 
 def send_message(bot: Bot, message: str):
     """Функция отправляет сообщение о статусе домашней работы в чат."""
-    bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
-    logging.info(f'Бот успешно отправил сообщение "{message}"')
+    try:
+        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+        logging.info(f'Бот успешно отправил сообщение "{message}"')
+    except Exception as error:
+        TelegramError(f'Сбой при отправке сообщения, {error}')
 
 
 def get_api_answer(current_timestamp):
     """Функция делает запрос к API и возвращает ответ API."""
-    timestamp = current_timestamp
-    params = {'from_date': timestamp}
-    response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-    if response.status_code == HTTPStatus.OK:
-        return response.json()
-    else:
-        raise exceptions.APIPracticumNotAvaliable(
-            f'API {ENDPOINT} не доступен, код ответа: {response.status_code}'
-        )
+    params = {'from_date': current_timestamp}
+    try:
+        response = requests.get(ENDPOINT, headers=HEADERS, params=params)
+        if response.status_code == HTTPStatus.OK:
+            return response.json()
+        else:
+            raise exceptions.APIPracticumNotAvaliable(
+                f'API {ENDPOINT} не доступен, код: {response.status_code}'
+            )
+    except Exception as error:
+        ConnectionError(f'Ошибка подлючения, {error}')
+        json.decoder.JSONDecodeError('Запрос не удалось преобразовать')
 
 
 def check_response(response):
@@ -58,9 +65,7 @@ def check_response(response):
         raise TypeError('Тип ответа API не словарь')
     homeworks = response.get('homeworks')
     if not isinstance(homeworks, list):
-        raise TypeError('Тип "homeworks" не список')
-    elif not homeworks:
-        raise exceptions.HomeworkListEmpty('В списке нет домашних работ')
+        raise TypeError('Ключ "homeworks" не список')
     return homeworks
 
 
@@ -69,11 +74,11 @@ def parse_status(homework):
     Возвращает строку-вердикт из словаря HOMEWORK_STATUSES.
     """
     homework_name = homework.get('homework_name')
-    if not homework_name:
+    if homework_name is None:
         raise KeyError(f'Ключ {homework_name} не найден в {homework}')
     homework_status = homework.get('status')
     verdict = HOMEWORK_STATUSES.get(homework_status)
-    if not verdict:
+    if verdict is None:
         raise KeyError(
             f'{homework_status} не найден в {HOMEWORK_STATUSES}'
         )
@@ -82,45 +87,43 @@ def parse_status(homework):
 
 def check_tokens():
     """Функция проверят доступность переменных окружения."""
-    if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
-        return True
-    else:
-        return False
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def main():
     """Основная логика работы бота."""
-    current_timestamp = int(time.time())
+    current_timestamp = int(time.time()) - 5
     bot = Bot(token=TELEGRAM_TOKEN)
     previous_message = ''
-    while check_tokens() is True:
+    if check_tokens() is True:
         try:
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
-            if len(homeworks) > 0:
-                assert len(homeworks) == 1
+            if len(homeworks) == 0:
+                message = 'Нет новых домашних работ'
+                logging.debug(msg=message, exc_info=True)
+            else:
                 homework = homeworks[0]
                 message = parse_status(homework)
-        except exceptions.APIPracticumNotAvaliable as error:
-            logging.error(error, exc_info=True)
-        except TypeError as error:
-            logging.error(error, exc_info=True)
-            message = 'Тип данных в ответе API не соответствует ожидаемому'
-        except exceptions.HomeworkListEmpty as error:
-            logging.error(error, exc_info=True)
-            message = 'В списке нет домашних работ за указанный период'
-        except KeyError as error:
-            logging.error(error, exc_info=True)
-            message = 'Ожидаемые ключи в ответе API отсутствуют'
-        except TelegramError as error:
-            message = f'Сбой в работе программы {error}'
-            logging.error(message, exc_info=True)
-        if previous_message != message:
-            send_message(bot, message)
-            previous_message = message
-        else:
-            current_timestamp = int(time.time())
-            time.sleep(RETRY_TIME)
+        except Exception:
+            logging.exception(TelegramError)
+            message = TelegramError
+            logging.exception(exceptions.APIPracticumNotAvaliable)
+            message = exceptions.APIPracticumNotAvaliable.__doc__
+            logging.exception(json.decoder.JSONDecodeError)
+            message = json.decoder.JSONDecodeError.args
+            logging.exception(ConnectionError)
+            message = ConnectionError.args
+            logging.exception(TypeError)
+            message = TypeError.args
+            logging.exception(KeyError)
+            message = KeyError.args
+            if previous_message != message:
+                send_message(bot, message)
+                previous_message = message
+            else:
+                current_timestamp = current_timestamp
+                time.sleep(RETRY_TIME)
     else:
         logging.critical(exc_info=True)
         raise exceptions.TokenMissing(
