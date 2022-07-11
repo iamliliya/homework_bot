@@ -118,7 +118,9 @@ def main():
             current_timestamp = timestamp
             time.sleep(RETRY_TIME)
     else:
-        logging.critical('Один или несколько токенов отсутствуют', exc_info=True)
+        logging.critical(
+            msg='Один или несколько токенов отсутствуют', exc_info=True
+        )
         sys.exit
 
 
