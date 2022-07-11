@@ -1,3 +1,4 @@
+from sqlite3 import Timestamp
 import exceptions
 import json
 import logging
@@ -92,7 +93,8 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-    current_timestamp = int(time.time()) - 5
+    timestamp = int(time.time())
+    current_timestamp = 0
     bot = Bot(token=TELEGRAM_TOKEN)
     previous_message = ''
     if check_tokens() is True:
@@ -105,24 +107,25 @@ def main():
             else:
                 homework = homeworks[0]
                 message = parse_status(homework)
-        except Exception:
-            logging.exception(TelegramError)
+                send_message(bot, message)
+        except Exception as error:
+            logging.error(f'{TelegramError}, {error}')
             message = TelegramError
-            logging.exception(exceptions.APIPracticumNotAvaliable)
-            message = exceptions.APIPracticumNotAvaliable.__doc__
-            logging.exception(json.decoder.JSONDecodeError)
-            message = json.decoder.JSONDecodeError.args
-            logging.exception(ConnectionError)
-            message = ConnectionError.args
-            logging.exception(TypeError)
-            message = TypeError.args
-            logging.exception(KeyError)
-            message = KeyError.args
+            # logging.exception(exceptions.APIPracticumNotAvaliable)
+            # message = exceptions.APIPracticumNotAvaliable
+            # logging.exception(json.decoder.JSONDecodeError)
+            # message = json.decoder.JSONDecodeError
+            # logging.exception(ConnectionError)
+            # message = ConnectionError
+            # logging.exception(TypeError)
+            # message = TypeError
+            # logging.exception(KeyError)
+            # message = KeyError
             if previous_message != message:
                 send_message(bot, message)
                 previous_message = message
             else:
-                current_timestamp = current_timestamp
+                current_timestamp = timestamp
                 time.sleep(RETRY_TIME)
     else:
         logging.critical(exc_info=True)
