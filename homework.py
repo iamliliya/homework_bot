@@ -110,12 +110,12 @@ def main():
         except Exception as error:
             message = f'{type(error)}: {error}'
             logging.error(message)
-            if previous_message != message:
-                send_message(bot, message)
-                previous_message = message
-            else:
-                current_timestamp = timestamp
-                time.sleep(RETRY_TIME)
+        if previous_message != message:
+            send_message(bot, message)
+            previous_message = message
+        else:
+            current_timestamp = timestamp
+            time.sleep(RETRY_TIME)
     else:
         logging.critical(exc_info=True)
         raise exceptions.TokenMissing(
