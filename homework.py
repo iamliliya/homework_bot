@@ -1,4 +1,3 @@
-from sqlite3 import Timestamp
 import exceptions
 import json
 import logging
@@ -109,18 +108,8 @@ def main():
                 message = parse_status(homework)
                 send_message(bot, message)
         except Exception as error:
-            logging.error(f'{TelegramError}, {error}')
-            message = TelegramError
-            # logging.exception(exceptions.APIPracticumNotAvaliable)
-            # message = exceptions.APIPracticumNotAvaliable
-            # logging.exception(json.decoder.JSONDecodeError)
-            # message = json.decoder.JSONDecodeError
-            # logging.exception(ConnectionError)
-            # message = ConnectionError
-            # logging.exception(TypeError)
-            # message = TypeError
-            # logging.exception(KeyError)
-            # message = KeyError
+            message = f'{type(error)}: {error}'
+            logging.error(message)
             if previous_message != message:
                 send_message(bot, message)
                 previous_message = message
