@@ -107,7 +107,6 @@ def main():
             else:
                 homework = homeworks[0]
                 message = parse_status(homework)
-                send_message(bot, message)
         except Exception as error:
             message = f'{type(error)}: {error}'
             logging.error(message)
