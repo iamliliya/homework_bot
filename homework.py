@@ -2,6 +2,7 @@ import exceptions
 import json
 import logging
 import os
+import sys
 import requests
 import time
 
@@ -117,10 +118,8 @@ def main():
             current_timestamp = timestamp
             time.sleep(RETRY_TIME)
     else:
-        logging.critical(exc_info=True)
-        raise exceptions.TokenMissing(
-            'Одна или несколько переменных окружения не найдены',
-        )
+        logging.critical('Один или несколько токенов отсутствуют', exc_info=True)
+        sys.exit
 
 
 if __name__ == '__main__':
