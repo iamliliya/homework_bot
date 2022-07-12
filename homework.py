@@ -1,3 +1,4 @@
+import telegram
 import exceptions
 import json
 import logging
@@ -9,7 +10,7 @@ import time
 
 from dotenv import load_dotenv
 from http import HTTPStatus
-from telegram import Bot, TelegramError
+from telegram import Bot
 
 
 load_dotenv()
@@ -38,8 +39,8 @@ def send_message(bot: Bot, message: str):
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logging.info(f'Бот успешно отправил сообщение "{message}"')
-    except Exception as error:
-        TelegramError(f'Сбой при отправке сообщения, {error}')
+    except telegram.TelegramError as error:
+        logging.error(f'Сбой при отправке сообщения, {error}')
 
 
 def get_api_answer(current_timestamp):
@@ -47,15 +48,19 @@ def get_api_answer(current_timestamp):
     params = {'from_date': current_timestamp}
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-        if response.status_code == HTTPStatus.OK:
+    except Exception:
+        raise requests.exceptions.ConnectionError('Ошибка соединения')
+    if response.status_code != HTTPStatus.OK:
+        raise exceptions.APIPracticumNotAvaliable(
+            f'API {ENDPOINT} не доступен, код: {response.status_code}'
+        )
+    else:
+        try:
             return response.json()
-        else:
-            raise exceptions.APIPracticumNotAvaliable(
-                f'API {ENDPOINT} не доступен, код: {response.status_code}'
+        except Exception:
+            raise json.decoder.JSONDecodeError(
+                'Запрос не удалось преобразовать'
             )
-    except Exception as error:
-        ConnectionError(f'Ошибка подлючения, {error}')
-        json.decoder.JSONDecodeError('Запрос не удалось преобразовать')
 
 
 def check_response(response):
@@ -74,6 +79,8 @@ def parse_status(homework):
     """Функция извлекает статус конкретной домашней работы.
     Возвращает строку-вердикт из словаря HOMEWORK_STATUSES.
     """
+    if not isinstance(homework, dict):
+        raise TypeError('"Homework" не словарь')
     homework_name = homework.get('homework_name')
     if homework_name is None:
         raise KeyError(f'Ключ {homework_name} не найден в {homework}')
@@ -93,11 +100,15 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-    timestamp = int(time.time())
     current_timestamp = 0
     bot = Bot(token=TELEGRAM_TOKEN)
     previous_message = ''
-    if check_tokens() is True:
+    if check_tokens() is False:
+        logging.critical(
+            msg='Один или несколько токенов отсутствуют', exc_info=True
+        )
+        sys.exit
+    while True:
         try:
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
@@ -107,20 +118,17 @@ def main():
             else:
                 homework = homeworks[0]
                 message = parse_status(homework)
+                if previous_message != message:
+                    send_message(bot, message)
+                    previous_message = message
         except Exception as error:
             message = f'{type(error)}: {error}'
             logging.error(message)
-        if previous_message != message:
-            send_message(bot, message)
-            previous_message = message
-        else:
-            current_timestamp = timestamp
-            time.sleep(RETRY_TIME)
-    else:
-        logging.critical(
-            msg='Один или несколько токенов отсутствуют', exc_info=True
-        )
-        sys.exit
+            if previous_message != message:
+                send_message(bot, message)
+                previous_message = message
+        current_timestamp = response.get('current_date')
+        time.sleep(RETRY_TIME)
 
 
 if __name__ == '__main__':
