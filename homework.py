@@ -103,7 +103,7 @@ def main():
     current_timestamp = 0
     bot = Bot(token=TELEGRAM_TOKEN)
     previous_message = ''
-    if check_tokens() is False:
+    if not check_tokens():
         logging.critical(
             msg='Один или несколько токенов отсутствуют', exc_info=True
         )
@@ -118,9 +118,8 @@ def main():
             else:
                 homework = homeworks[0]
                 message = parse_status(homework)
-                if previous_message != message:
-                    send_message(bot, message)
-                    previous_message = message
+                send_message(bot, message)
+                previous_message = ''
         except Exception as error:
             message = f'{type(error)}: {error}'
             logging.error(message)
