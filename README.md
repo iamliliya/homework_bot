@@ -30,21 +30,11 @@ pip install -r requirements.txt
 
 Создать файл .env в директории проекта и пропишите в нем:
 ```
-PRACTICUM_TOKEN = токен Яндекс практикум.
-TELEGRAM_TOKEN = токен Telegram полученный от BotFather.
+PRACTICUM_TOKEN = токен Яндекс.Практикум.
+TELEGRAM_TOKEN = токен Telegram, полученный от BotFather.
 TELEGRAM_CHAT_ID = id вашего чата в Telegram.
 ```
 Запустить проект:
 ```
 python homework.py
 ```
-
-Получаем токены:
-Зарегистрируйте бота в BotFather:
-Регистрация бота и получение токена
-
-Получите токен в ЯндексПрактикум:
-Получить токен
-
-Получите id своего чата у бота Userinfobot:
-Получить свой id
